@@ -119,7 +119,7 @@ Edit `print_server/settings.py` to customize:
 ### Printer Configuration
 Edit `printer/printer_utils.py` to change:
 
-- **PRINTER_NAME**: Change the default printer name (line 92)
+- **PRINTER_NAME**: Change the default printer name (line 75)
 - Add support for additional printers
 
 ## API Endpoints
