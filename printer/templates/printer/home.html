@@ -1,0 +1,229 @@
+{% extends "printer/base.html" %}
+
+{% block content %}
+<div class="main-content">
+    <div class="card">
+        <h2>📄 Upload & Print</h2>
+        <form id="upload-form" method="post" action="{% url 'upload_and_print' %}" enctype="multipart/form-data">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label for="{{ form.file.id_for_label }}">{{ form.file.label }}</label>
+                {{ form.file }}
+                {% if form.file.help_text %}
+                    <small style="color: #666;">{{ form.file.help_text }}</small>
+                {% endif %}
+                {% if form.file.errors %}
+                    <div class="message message-error">{{ form.file.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-group">
+                <label for="{{ form.copies.id_for_label }}">{{ form.copies.label }}</label>
+                {{ form.copies }}
+                {% if form.copies.errors %}
+                    <div class="message message-error">{{ form.copies.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <button type="submit" id="print-button">🖨️ Upload & Print</button>
+        </form>
+        
+        <div id="upload-message" style="margin-top: 15px;"></div>
+    </div>
+    
+    <div class="card">
+        <h2>🔧 Printer Controls</h2>
+        
+        <div id="printer-info" class="info-grid">
+            <div class="loading">Loading printer information...</div>
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <button onclick="printTestPage()" class="btn-success">🧪 Print Test Page</button>
+            <button onclick="refreshQueue()" class="btn-secondary" style="margin-left: 10px;">🔄 Refresh Queue</button>
+        </div>
+        
+        <div id="print-queue" style="margin-top: 20px;"></div>
+        
+        <div class="qr-section">
+            <h3>Scan to Access</h3>
+            <img src="{% url 'generate_qr' %}" alt="QR Code">
+            <p><small>Scan with your phone to access the print server</small></p>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>📋 Recent Print History</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>Filename</th>
+                <th>Status</th>
+                <th>Copies</th>
+                <th>Size</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for print in recent_prints %}
+            <tr>
+                <td>{{ print.timestamp|date:"Y-m-d H:i:s" }}</td>
+                <td>{{ print.filename }}</td>
+                <td>
+                    {% if print.status == 'completed' %}
+                        <span class="badge badge-success">{{ print.status|upper }}</span>
+                    {% elif print.status == 'failed' %}
+                        <span class="badge badge-danger">{{ print.status|upper }}</span>
+                    {% elif print.status == 'printing' %}
+                        <span class="badge badge-info">{{ print.status|upper }}</span>
+                    {% else %}
+                        <span class="badge badge-warning">{{ print.status|upper }}</span>
+                    {% endif %}
+                </td>
+                <td>{{ print.copies }}</td>
+                <td>
+                    {% if print.file_size %}
+                        {{ print.file_size|filesizeformat }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" style="text-align: center; color: #999;">No print history yet</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <div style="margin-top: 15px; text-align: center;">
+        <a href="{% url 'print_history' %}" style="color: #667eea; text-decoration: none; font-weight: 600;">
+            View Full History →
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Handle form submission via AJAX
+    document.getElementById('upload-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const messageDiv = document.getElementById('upload-message');
+        const button = document.getElementById('print-button');
+        
+        button.disabled = true;
+        button.textContent = '⏳ Uploading...';
+        messageDiv.innerHTML = '';
+        
+        fetch('{% url "upload_and_print" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                messageDiv.innerHTML = `<div class="message message-success">✓ ${data.message}</div>`;
+                document.getElementById('upload-form').reset();
+                // Refresh page after 2 seconds to update history
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                messageDiv.innerHTML = `<div class="message message-error">✗ ${data.message}</div>`;
+            }
+        })
+        .catch(error => {
+            messageDiv.innerHTML = `<div class="message message-error">✗ Error uploading file</div>`;
+            console.error('Error:', error);
+        })
+        .finally(() => {
+            button.disabled = false;
+            button.textContent = '🖨️ Upload & Print';
+        });
+    });
+    
+    // Update printer info
+    function updatePrinterInfo() {
+        fetch('/api/printer-status/')
+            .then(response => response.json())
+            .then(data => {
+                const infoDiv = document.getElementById('printer-info');
+                infoDiv.innerHTML = `
+                    <div class="info-label">Printer Name:</div>
+                    <div class="info-value">${data.name}</div>
+                    
+                    <div class="info-label">Status:</div>
+                    <div class="info-value">${data.message}</div>
+                    
+                    <div class="info-label">Jobs in Queue:</div>
+                    <div class="info-value">${data.jobs_count}</div>
+                    
+                    <div class="info-label">Default Printer:</div>
+                    <div class="info-value">${data.is_default ? 'Yes' : 'No'}</div>
+                `;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('printer-info').innerHTML = 
+                    '<div class="message message-error">Error loading printer info</div>';
+            });
+    }
+    
+    // Refresh print queue
+    function refreshQueue() {
+        const queueDiv = document.getElementById('print-queue');
+        queueDiv.innerHTML = '<div class="loading">Loading queue...</div>';
+        
+        fetch('/api/print-queue/')
+            .then(response => response.json())
+            .then(data => {
+                if (data.queue.length === 0) {
+                    queueDiv.innerHTML = '<div class="message message-info">Queue is empty</div>';
+                } else {
+                    let html = '<h3>Print Queue</h3><table><thead><tr><th>Job ID</th><th>Document</th><th>Pages</th></tr></thead><tbody>';
+                    data.queue.forEach(job => {
+                        html += `<tr><td>${job.job_id}</td><td>${job.document}</td><td>${job.pages}</td></tr>`;
+                    });
+                    html += '</tbody></table>';
+                    queueDiv.innerHTML = html;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                queueDiv.innerHTML = '<div class="message message-error">Error loading queue</div>';
+            });
+    }
+    
+    // Print test page
+    function printTestPage() {
+        if (!confirm('Send a test page to the printer?')) return;
+        
+        fetch('/api/test-print/')
+            .then(response => response.json())
+            .then(data => {
+                const messageDiv = document.getElementById('upload-message');
+                if (data.success) {
+                    messageDiv.innerHTML = `<div class="message message-success">✓ ${data.message}</div>`;
+                    setTimeout(() => location.reload(), 2000);
+                } else {
+                    messageDiv.innerHTML = `<div class="message message-error">✗ ${data.message}</div>`;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error sending test page');
+            });
+    }
+    
+    // Initialize
+    updatePrinterInfo();
+    setInterval(updatePrinterInfo, 10000);  // Update every 10 seconds
+</script>
+{% endblock %}

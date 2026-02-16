@@ -1,11 +1,16 @@
-from wsgiref.simple_server import make_server
+"""
+WSGI config for print_server project.
 
-class SimpleApp:
-    def __call__(self, environ, start_response):
-        start_response('200 OK', [('Content-Type', 'text/plain')])
-        return [b'Hello, WSGI World!']
+It exposes the WSGI callable as a module-level variable named ``application``.
 
-if __name__ == '__main__':
-    server = make_server('localhost', 8000, SimpleApp())
-    print('Serving on http://localhost:8000/')
-    server.serve_forever()
+For more information on this file, see
+https://docs.djangoproject.com/en/4.0/howto/deployment/wsgi/
+"""
+
+import os
+
+from django.core.wsgi import get_wsgi_application
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'print_server.settings')
+
+application = get_wsgi_application()

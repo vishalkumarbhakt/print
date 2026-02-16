@@ -1,0 +1,72 @@
+{% extends "printer/base.html" %}
+
+{% block title %}Print History - {{ block.super }}{% endblock %}
+
+{% block header %}Print History{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>📋 Complete Print History</h2>
+    
+    <div style="margin-bottom: 15px;">
+        <a href="{% url 'home' %}" style="color: #667eea; text-decoration: none; font-weight: 600;">
+            ← Back to Home
+        </a>
+    </div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Timestamp</th>
+                <th>Filename</th>
+                <th>Status</th>
+                <th>Copies</th>
+                <th>Size</th>
+                <th>IP Address</th>
+                <th>Error Message</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for print in history %}
+            <tr>
+                <td>{{ print.id }}</td>
+                <td>{{ print.timestamp|date:"Y-m-d H:i:s" }}</td>
+                <td>{{ print.filename }}</td>
+                <td>
+                    {% if print.status == 'completed' %}
+                        <span class="badge badge-success">{{ print.status|upper }}</span>
+                    {% elif print.status == 'failed' %}
+                        <span class="badge badge-danger">{{ print.status|upper }}</span>
+                    {% elif print.status == 'printing' %}
+                        <span class="badge badge-info">{{ print.status|upper }}</span>
+                    {% else %}
+                        <span class="badge badge-warning">{{ print.status|upper }}</span>
+                    {% endif %}
+                </td>
+                <td>{{ print.copies }}</td>
+                <td>
+                    {% if print.file_size %}
+                        {{ print.file_size|filesizeformat }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>{{ print.ip_address|default:"-" }}</td>
+                <td>
+                    {% if print.error_message %}
+                        <span style="color: #721c24; font-size: 12px;">{{ print.error_message }}</span>
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8" style="text-align: center; color: #999;">No print history available</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

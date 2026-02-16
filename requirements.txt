@@ -1,2 +1,7 @@
 # requirements.txt
 Django>=4.0
+Pillow>=10.0.0
+qrcode[pil]>=7.4.2
+
+# Windows-specific dependencies (install manually on Windows)
+# pywin32>=305
